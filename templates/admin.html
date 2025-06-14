@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 - 文件管理系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('index') }}">文件管理系统</a>
+        <div class="navbar-nav">
+             <a class="nav-link" href="{{ url_for('index') }}"><i class="bi bi-files"></i> 文件管理</a>
+            <span class="nav-link active"><i class="bi bi-people-fill"></i> 用户管理</span>
+        </div>
+        <div class="d-flex">
+            <span class="navbar-text me-3">
+                欢迎, {{ session.username }} ({{ session.role }})
+            </span>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-light">登出</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div id="alert-container"></div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>用户管理</h3>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="registrationSwitch" {{ 'checked' if registration_enabled else '' }}>
+            <label class="form-check-label" for="registrationSwitch">允许新用户注册</label>
+        </div>
+    </div>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">添加新用户</h5></div>
+        <div class="card-body">
+            <form id="addUserForm" class="row g-3 align-items-end">
+                <div class="col-md-3"><label for="newUsername" class="form-label">用户名</label><input type="text" class="form-control" id="newUsername" required></div>
+                <div class="col-md-3"><label for="newPassword" class="form-label">密码</label><input type="password" class="form-control" id="newPassword" required></div>
+                <div class="col-md-3"><label for="newRole" class="form-label">角色</label><select id="newRole" class="form-select"><option value="user" selected>普通用户</option><option value="admin">管理员</option></select></div>
+                <div class="col-md-3"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-person-plus-fill"></i> 添加</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>角色</th>
+                    <th class="text-center" title="上传"><i class="bi bi-upload"></i></th>
+                    <th class="text-center" title="删除"><i class="bi bi-trash"></i></th>
+                    <th class="text-center" title="重命名"><i class="bi bi-pencil-square"></i></th>
+                    <th class="text-center" title="移动"><i class="bi bi-arrows-move"></i></th>
+                    <th class="text-center" title="新建文件夹"><i class="bi bi-folder-plus"></i></th>
+                    <th class="text-end">操作</th>
+                </tr>
+            </thead>
+            <tbody id="user-list-body">
+                {% for user in users %}
+                <tr data-user-id="{{ user.id }}">
+                    <td>{{ user.id }}</td>
+                    <td data-field="username">{{ user.username }}</td>
+                    <td data-field="role">{{ user.role }}</td>
+                    <input type="hidden" name="can_upload" value="{{ 'true' if user.can_upload else 'false' }}">
+                    <input type="hidden" name="can_delete" value="{{ 'true' if user.can_delete else 'false' }}">
+                    <input type="hidden" name="can_rename" value="{{ 'true' if user.can_rename else 'false' }}">
+                    <input type="hidden" name="can_move" value="{{ 'true' if user.can_move else 'false' }}">
+                    <input type="hidden" name="can_create_folder" value="{{ 'true' if user.can_create_folder else 'false' }}">
+                    
+                    {% if user.role == 'admin' %}
+                        <td class="text-center" colspan="5"><em class="text-muted">管理员拥有所有权限</em></td>
+                    {% else %}
+                        <td class="text-center">{% if user.can_upload %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %}</td>
+                        <td class="text-center">{% if user.can_delete %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %}</td>
+                        <td class="text-center">{% if user.can_rename %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %}</td>
+                        <td class="text-center">{% if user.can_move %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %}</td>
+                        <td class="text-center">{% if user.can_create_folder %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %}</td>
+                    {% endif %}
+                    
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-secondary edit-user-btn" data-bs-toggle="modal" data-bs-target="#editUserModal"><i class="bi bi-pencil-square"></i> 编辑</button>
+                        <button class="btn btn-sm btn-outline-danger delete-user-btn"><i class="bi bi-trash"></i> 删除</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editUserForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editUserModalLabel">编辑用户</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editUserId">
+            <div class="mb-3">
+                <label for="editUsername" class="form-label">用户名</label>
+                <input type="text" class="form-control" id="editUsername" required>
+            </div>
+            <div class="mb-3">
+                <label for="editPassword" class="form-label">新密码 (可选)</label>
+                <input type="password" class="form-control" id="editPassword" placeholder="留空则不修改密码">
+            </div>
+            <div class="mb-3">
+                <label for="editRole" class="form-label">角色</label>
+                <select id="editRole" class="form-select">
+                    <option value="user">普通用户</option>
+                    <option value="admin">管理员</option>
+                </select>
+            </div>
+            <hr>
+            <h6>权限设置</h6>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="editCanUpload"><label class="form-check-label" for="editCanUpload">允许上传</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="editCanDelete"><label class="form-check-label" for="editCanDelete">允许删除</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="editCanRename"><label class="form-check-label" for="editCanRename">允许重命名</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="editCanMove"><label class="form-check-label" for="editCanMove">允许移动</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="editCanCreateFolder"><label class="form-check-label" for="editCanCreateFolder">允许新建文件夹</label></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存更改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+</script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

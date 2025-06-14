@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - 文件管理系统</title>
+    <title>注册 - 文件管理系统</title>
     <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
 </head>
 <body>
@@ -12,7 +12,7 @@
         <div class="col-md-6 col-lg-4">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="text-center">文件管理系统登录</h3>
+                    <h3 class="text-center">创建新账户</h3>
                 </div>
                 <div class="card-body">
                     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -33,15 +33,13 @@
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">登录</button>
+                            <button type="submit" class="btn btn-primary">注册</button>
                         </div>
                     </form>
                 </div>
-                {% if registration_enabled %}
                 <div class="card-footer text-center">
-                    <a href="{{ url_for('register') }}">没有账户？立即注册</a>
+                    <a href="{{ url_for('login') }}">已有账户？直接登录</a>
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>

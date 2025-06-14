@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜索结果 - 文件管理系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('index') }}">文件管理系统</a>
+        <form class="d-flex mx-auto" action="{{ url_for('search') }}" method="get" style="width: 50%;">
+            <input class="form-control me-2" type="search" name="q" placeholder="搜索文件或文件夹..." aria-label="Search" value="{{ query }}">
+            <button class="btn btn-outline-success" type="submit"><i class="bi bi-search"></i></button>
+        </form>
+        <div class="d-flex">
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-light">登出</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <h3>关于“{{ query }}”的搜索结果</h3>
+    <p class="text-muted">共找到 {{ results|length }} 个匹配项。</p>
+    <hr>
+
+    {% if results %}
+        <ul class="list-group">
+            {% for item in results %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        {% if item.is_dir %}
+                            <i class="bi bi-folder-fill text-primary"></i>
+                            <a href="{{ url_for('index', subpath=item.path) }}" class="text-decoration-none fw-bold ms-2">{{ item.name }}</a>
+                        {% else %}
+                            <i class="bi bi-file-earmark-text text-secondary"></i>
+                            <span class="ms-2">{{ item.name }}</span>
+                        {% endif %}
+                        <br>
+                        <small class="text-muted ms-4">
+                            路径: <a href="{{ url_for('index', subpath=item.parent) }}" class="text-decoration-none">{{ item.parent if item.parent else '根目录' }}</a>
+                        </small>
+                    </div>
+                    <div>
+                        {% if not item.is_dir %}
+                            <a href="{{ url_for('download_file', filepath=item.path) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 下载</a>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="alert alert-warning">没有找到匹配的文件或文件夹。</div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> 返回主页</a>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

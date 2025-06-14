@@ -9,17 +9,30 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<!-- Navbar, 消息闪现, 面包屑, 操作按钮 (保持不变，此处省略) -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('index') }}">文件管理系统</a>
-        <div class="d-flex">
+        <form class="d-flex mx-auto" action="{{ url_for('search') }}" method="get" style="width: 50%;">
+            <input class="form-control me-2" type="search" name="q" placeholder="搜索文件或文件夹..." aria-label="Search" value="{{ request.args.get('q', '') }}">
+            <button class="btn btn-outline-success" type="submit"><i class="bi bi-search"></i></button>
+        </form>
+        <div class="d-flex align-items-center">
+            {% if session.role == 'admin' %}
+            <a class="nav-link text-white-50 me-3" href="{{ url_for('admin_panel') }}">
+                <i class="bi bi-gear-fill"></i> 后台管理
+            </a>
+            {% endif %}
+            <span class="navbar-text me-3">
+                欢迎, {{ session.username }} ({{ session.role }})
+            </span>
             <a href="{{ url_for('logout') }}" class="btn btn-outline-light">登出</a>
         </div>
     </div>
 </nav>
 
 <div class="container mt-4">
+    <div id="alert-container"></div>
+    
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -33,7 +46,13 @@
 
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-door-fill"></i> 根目录</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}"><i class="bi bi-house-door-fill"></i> 
+                {% if session.role == 'admin' %}
+                    所有用户文件
+                {% else %}
+                    我的文件
+                {% endif %}
+            </a></li>
             {% for crumb in breadcrumbs %}
                 <li class="breadcrumb-item"><a href="{{ url_for('index', subpath=crumb.path) }}">{{ crumb.name }}</a></li>
             {% endfor %}
@@ -41,70 +60,111 @@
     </nav>
     
     <div class="mb-3 d-flex flex-wrap gap-2">
-        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="bi bi-upload"></i> 上传文件</button>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="bi bi-upload"></i> 上传</button>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newFolderModal"><i class="bi bi-folder-plus"></i> 新建文件夹</button>
-        <button id="moveSelectedBtn" class="btn btn-info" disabled><i class="bi bi-arrows-move"></i> 移动选中</button>
-        <button id="deleteSelectedBtn" class="btn btn-danger" disabled><i class="bi bi-trash"></i> 删除选中</button>
+        <button id="moveSelectedBtn" class="btn btn-info" disabled><i class="bi bi-arrows-move"></i> 移动</button>
+        <button id="deleteSelectedBtn" class="btn btn-danger" disabled><i class="bi bi-trash"></i> 删除</button>
     </div>
 
-    <!-- 文件列表 -->
-    <form id="fileActionForm" method="post">
-        <input type="hidden" name="current_path" value="{{ current_path }}">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 40px;"><input class="form-check-input" type="checkbox" id="selectAll"></th>
-                        <th>名称</th>
-                        <th style="width: 150px;">大小</th> <!-- 稍微加宽 -->
-                        <th class="text-end" style="width: 120px;">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for item in items %}
-                    <tr>
-                        <td><input class="form-check-input item-checkbox" type="checkbox" name="items[]" value="{{ item.name }}"></td>
-                        <td>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 40px;"><input class="form-check-input" type="checkbox" id="selectAll"></th>
+                    <th>名称</th>
+                    <th style="width: 150px;">大小</th>
+                    <th class="text-end" style="width: 280px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="file-list-body">
+            {% for item in items %}
+                <tr data-name="{{ item.name }}">
+                    <td><input class="form-check-input item-checkbox" type="checkbox" name="items[]" value="{{ item.name }}"></td>
+                    <td>
+                        {% if item.is_dir %}
+                            <i class="bi bi-folder-fill text-primary"></i>
+                            <a href="{{ url_for('index', subpath=item.path) }}" class="text-decoration-none text-dark fw-bold">{{ item.name }}</a>
+                        {% else %}
+                            <i class="bi bi-file-earmark-text text-secondary"></i>
+                            <span>{{ item.name }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small class="text-muted">
                             {% if item.is_dir %}
-                                <i class="bi bi-folder-fill text-primary"></i>
-                                <a href="{{ url_for('index', subpath=item.path) }}" class="text-decoration-none text-dark fw-bold">{{ item.name }}</a>
+                                <span class="dir-size-display" data-path="{{ item.path }}">-</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary p-0 px-1 ms-1 calc-dir-size-btn" data-path="{{ item.path }}" title="计算目录大小">
+                                    <i class="bi bi-calculator"></i>
+                                </button>
                             {% else %}
-                                <i class="bi bi-file-earmark-text text-secondary"></i>
-                                <span>{{ item.name }}</span>
+                                {{ item.size }}
                             {% endif %}
-                        </td>
-                        <td>
-                            <small class="text-muted">
-                                <!-- 新增：按需计算目录大小的逻辑 -->
-                                {% if item.is_dir %}
-                                    <span class="dir-size-display" data-path="{{ item.path }}">-</span>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary p-0 px-1 ms-1 calc-dir-size-btn" data-path="{{ item.path }}" title="计算目录大小">
-                                        <i class="bi bi-calculator"></i>
-                                    </button>
-                                {% else %}
-                                    {{ item.size }}
-                                {% endif %}
-                            </small>
-                        </td>
-                        <td class="text-end">
-                            {% if not item.is_dir %}
-                            <a href="{{ url_for('download_file', filepath=item.path) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 下载</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">这个文件夹是空的</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </form>
+                        </small>
+                    </td>
+                    <td class="text-end">
+                        {% if item.previewable %}
+                        <button type="button" class="btn btn-sm btn-outline-info preview-btn"
+                                data-bs-toggle="modal" data-bs-target="#previewModal"
+                                data-path="{{ item.path }}" data-name="{{ item.name }}">
+                            <i class="bi bi-eye"></i> 预览
+                        </button>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary rename-btn" 
+                                data-bs-toggle="modal" data-bs-target="#renameModal" 
+                                data-old-name="{{ item.name }}">
+                            <i class="bi bi-pencil-square"></i> 重命名
+                        </button>
+                        {% if not item.is_dir %}
+                        <a href="{{ url_for('download_file', filepath=item.path) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 下载</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr id="empty-folder-row">
+                    <td colspan="5" class="text-center text-muted">这个文件夹是空的</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<!-- Modals (保持不变，此处省略，实际文件中应保留) -->
-<!-- ... 所有Modal代码 ... -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewModalLabel">文件预览</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <iframe id="previewFrame" src="about:blank" style="width: 100%; height: 60vh; border: none;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="renameForm">
+          <div class="modal-header">
+            <h5 class="modal-title" id="renameModalLabel">重命名</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <input type="hidden" id="renameOldName" name="old_name">
+              <div class="mb-3">
+                <label for="renameNewName" class="form-label">新名称</label>
+                <input type="text" class="form-control" id="renameNewName" name="new_name" required>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary">确认</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -125,7 +185,7 @@
                     <div id="uploadProgressContainer" class="progress" style="display: none;">
                         <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
                     </div>
-                    <div id="uploadSuccessMessage" class="alert alert-success mt-3" style="display:none;">上传成功！页面即将刷新...</div>
+                    <div id="uploadSuccessMessage" class="alert alert-success mt-3" style="display:none;">上传成功！</div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -138,7 +198,7 @@
 <div class="modal fade" id="newFolderModal" tabindex="-1" aria-labelledby="newFolderModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form action="{{ url_for('create_folder', subpath=current_path) }}" method="post">
+      <form id="newFolderForm">
           <div class="modal-header">
             <h5 class="modal-title" id="newFolderModalLabel">新建文件夹</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -184,7 +244,7 @@
       </div>
       <div class="modal-body">
         <p>您确定要永久删除选中的项目吗？</p>
-        <p class="fw-bold">注意：非空文件夹将无法被删除。此操作无法撤销！</p>
+        <p class="fw-bold">此操作会删除文件夹下的所有内容，且无法撤销！</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -194,9 +254,13 @@
   </div>
 </div>
 
+
 <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script>const current_path = "{{ current_path }}";</script>
+<script>
+    const current_path = "{{ current_path }}";
+    const csrf_token = "{{ csrf_token() }}";
+</script>
 </body>
 </html>
