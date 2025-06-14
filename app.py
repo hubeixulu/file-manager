@@ -126,47 +126,6 @@ def index(subpath=''):
     items.sort(key=lambda x: (not x['is_dir'], x['name'].lower()))
     return render_template('index.html', items=items, current_path=subpath, breadcrumbs=breadcrumbs)
 
-# --- NEW: 新增的搜索路由 ---
-@app.route('/search')
-@login_required
-def search():
-    query = request.args.get('q', '').strip()
-    if not query:
-        flash('请输入搜索关键词', 'warning')
-        return redirect(request.referrer or url_for('index'))
-
-    results = []
-    for root, dirs, files in os.walk(BASE_DIR):
-        # 搜索目录
-        for name in dirs:
-            if query.lower() in name.lower():
-                item_path_abs = os.path.join(root, name)
-                relative_path = os.path.relpath(item_path_abs, BASE_DIR)
-                results.append({
-                    'name': name,
-                    'is_dir': True,
-                    'path': relative_path.replace('\\', '/'), # 统一路径分隔符为'/'
-                    'size': '' # 目录大小暂不计算
-                })
-        # 搜索文件
-        for name in files:
-            if query.lower() in name.lower():
-                item_path_abs = os.path.join(root, name)
-                relative_path = os.path.relpath(item_path_abs, BASE_DIR)
-                try:
-                    size = os.path.getsize(item_path_abs)
-                except (OSError, FileNotFoundError):
-                    size = None
-                results.append({
-                    'name': name,
-                    'is_dir': False,
-                    'path': relative_path.replace('\\', '/'),
-                    'size': human_readable_size(size)
-                })
-    
-    results.sort(key=lambda x: (not x['is_dir'], x['name'].lower()))
-    return render_template('search_results.html', results=results, query=query)
-
 
 @app.route('/upload/', methods=['POST'])
 @app.route('/upload/<path:subpath>', methods=['POST'])
